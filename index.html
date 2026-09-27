@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlashPeer - P2P File Transfer</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#000000">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FlashPeer">
+    <meta name="description" content="Direct browser-to-browser P2P file transfer. Zero cloud storage." />
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+    
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <nav class="top-nav">
+        <a href="https://flashpeer.pages.dev/" id="brand-link" class="nav-brand" title="FlashPeer Homepage">
+            <svg class="icon" style="width:24px;height:24px;color:white;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="white"></polygon>
+            </svg>
+            <h1>FlashPeer</h1>
+        </a>
+        <div class="nav-right">
+            <div class="wake-lock-badge" id="wake-lock-badge" title="Screen Wake Lock is active to prevent phone sleep during transfer">
+                <div class="wake-lock-dot"></div>
+                <span>Screen Active</span>
+            </div>
+            <button class="btn-history" id="open-history-btn">
+                <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                History
+            </button>
+        </div>
+    </nav>
+
+    <div class="content-wrapper">
+        <main>
+        <div class="workspace-grid">
+            <!-- LEFT CARD: Room / Connection / Controls -->
+            <div class="card card-control">
+                <div class="pill-track">
+                    <div class="pill-tab active" data-target="send-panel" id="tab-send">Send Files</div>
+                    <div class="pill-tab" data-target="receive-panel" id="tab-receive">Receive Files</div>
+                </div>
+
+                <!-- SEND CONTROLS PANEL -->
+                <div id="send-panel" class="panel active">
+                    <div class="status-pill">
+                        <div class="status-dot waiting" id="send-dot"></div>
+                        <span class="status-text" id="send-status-text">Initializing network...</span>
+                    </div>
+
+                    <div class="otp-container">
+                        <span class="section-label">Your Room Code</span>
+                        <div class="otp-display" id="sender-code">-----</div>
+                        <div class="btn-group">
+                            <button class="btn btn-secondary btn-sm" id="copy-code-btn">
+                                <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                Copy Code
+                            </button>
+                            <button class="btn btn-secondary btn-sm" id="copy-link-btn">
+                                <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                                Share Link
+                            </button>
+                        </div>
+
+                        <!-- Optional Password / PIN Protection -->
+                        <div class="security-box" id="send-security-box">
+                            <label class="security-toggle-row" for="sender-pwd-toggle">
+                                <div class="security-toggle-left">
+                                    <svg class="icon" style="width:14px;height:14px;color:var(--text-secondary);" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                    <span>Protect with Passcode</span>
+                                </div>
+                                <input type="checkbox" id="sender-pwd-toggle">
+                            </label>
+                            <div class="security-input-wrap" id="sender-pwd-wrap">
+                                <input type="password" class="security-input" id="sender-pwd-input" placeholder="Set 4-8 digit PIN or secret" maxlength="16" autocomplete="new-password">
+                                <button type="button" class="security-eye-btn" id="sender-eye-btn" title="Toggle visibility">
+                                    <svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="connection-status-box" id="connection-status-box">
+                        <div class="status-box-header">
+                            <span id="status-box-icon-wrap" style="display:inline-flex;align-items:center;">
+                                <svg class="icon status-box-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+                            </span>
+                            <span class="status-box-title" id="status-box-title">Ready to Connect</span>
+                        </div>
+                        <p class="status-box-desc" id="status-box-desc">Share room code with the recipient, then add files or folders to send.</p>
+                    </div>
+
+                    <div class="send-action-wrap">
+                        <button class="btn btn-primary" id="send-btn" disabled>
+                            <svg class="icon" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                            Send to Peer
+                        </button>
+                    </div>
+
+                    <div class="transfer-stats" id="send-stats">
+                        <div class="progress-header">
+                            <span class="progress-title" id="send-progress-title">Transferring...</span>
+                            <span class="progress-pct" id="send-percentage">0%</span>
+                        </div>
+                        <div class="batch-progress-text" id="send-batch-text">File 0 of 0</div>
+                        <div class="progress-track">
+                            <div class="progress-fill" id="send-progress-bar"></div>
+                        </div>
+                        <div class="progress-footer">
+                            <span id="send-transferred">0 MB / 0 MB</span>
+                            <div class="metrics-right">
+                                <span class="eta-pill" id="send-eta" style="display: none;">ETA --:--</span>
+                                <span id="send-speed">0 MB/s</span>
+                            </div>
+                        </div>
+                        <div class="checksum-verification-card" id="send-verification-card">
+                            <div class="checksum-badge-left">
+                                <svg class="icon" style="width:14px;height:14px;color:#4ade80;" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                <span>SHA-256 Checksum</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span class="checksum-hash-code" id="send-checksum-hash" title="SHA-256 Hash">Computing...</span>
+                                <button type="button" class="btn-copy-hash" id="send-copy-hash-btn" title="Copy SHA-256 Checksum">
+                                    <svg class="icon" style="width:11px;height:11px;" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="send-more-btn-wrap" id="send-more-btn-wrap">
+                        <button class="btn btn-secondary" id="send-more-btn">
+                            <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            Send Another File to Peer
+                        </button>
+                    </div>
+                </div>
+
+                <!-- RECEIVE CONTROLS PANEL -->
+                <div id="receive-panel" class="panel">
+                    <div class="status-pill">
+                        <div class="status-dot waiting" id="receive-dot" style="animation: none;"></div>
+                        <span class="status-text" id="receive-status-text">Ready to connect</span>
+                    </div>
+
+                    <div id="receive-input-section">
+                        <span class="section-label">Enter Room Code</span>
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" class="otp-input" id="receive-code-input" placeholder="00000" maxlength="5" autocomplete="one-time-code">
+                        <button class="btn btn-primary" id="connect-btn">
+                            <svg class="icon" viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                            Connect
+                        </button>
+                    </div>
+
+                    <!-- Passcode Challenge (Only displayed if sender locked the room) -->
+                    <div id="receive-password-section" style="display: none; width: 100%; flex-direction: column; margin-bottom: 12px;">
+                        <span class="section-label" style="color: #38bdf8;">Passcode Required</span>
+                        <div style="position: relative; width: 100%; margin-bottom: 12px;">
+                            <input type="password" class="otp-input" id="receive-pwd-input" placeholder="Enter Passcode" style="font-size: 1.3rem; letter-spacing: 0.1em; padding: 10px 36px 10px 10px;" autocomplete="current-password">
+                            <button type="button" class="security-eye-btn" id="receiver-eye-btn" title="Toggle visibility" style="right: 14px;">
+                                <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                        <button class="btn btn-primary" id="unlock-pwd-btn">
+                            <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            Unlock Transfer
+                        </button>
+                    </div>
+
+                    <div class="connection-status-box" id="receive-info-box">
+                        <div class="status-box-header">
+                            <span id="receive-box-icon-wrap" style="display:inline-flex;align-items:center;">
+                                <svg class="icon status-box-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+                            </span>
+                            <span class="status-box-title" id="receive-box-title">Direct P2P Download</span>
+                        </div>
+                        <p class="status-box-desc" id="receive-box-desc">Enter the 5-digit code shown on the sender's screen to establish a direct WebRTC peer connection.</p>
+                    </div>
+
+                    <div id="receive-action-section" style="display: none; width: 100%; align-items: center; flex-direction: column; margin-top: 12px;">
+                        <div class="btn-group">
+                            <button class="btn btn-cancel" id="reject-batch-btn">
+                                <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                                Reject
+                            </button>
+                            <button class="btn btn-primary" id="accept-batch-btn">
+                                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                Accept Transfer
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="transfer-stats" id="receive-stats">
+                        <div class="progress-header">
+                            <span class="progress-title" id="receive-progress-title">Receiving...</span>
+                            <span class="progress-pct" id="receive-percentage">0%</span>
+                        </div>
+                        <div class="batch-progress-text" id="receive-batch-text">File 0 of 0</div>
+                        <div class="progress-track">
+                            <div class="progress-fill" id="receive-progress-bar"></div>
+                        </div>
+                        <div class="progress-footer" style="margin-bottom: 8px;">
+                            <span id="receive-transferred">0 MB / 0 MB</span>
+                            <div class="metrics-right">
+                                <span class="eta-pill" id="receive-eta" style="display: none;">ETA --:--</span>
+                                <span id="receive-speed">0 MB/s</span>
+                            </div>
+                        </div>
+                        <div class="checksum-verification-card" id="receive-verification-card">
+                            <div class="checksum-badge-left">
+                                <svg class="icon" style="width:14px;height:14px;color:#4ade80;" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                <span id="receive-verification-text">Verified Match (SHA-256)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span class="checksum-hash-code" id="receive-checksum-hash" title="SHA-256 Hash">Verifying...</span>
+                                <button type="button" class="btn-copy-hash" id="receive-copy-hash-btn" title="Copy SHA-256 Checksum">
+                                    <svg class="icon" style="width:11px;height:11px;" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT CARD: Files Hub / Staging Area (Send Mode) or Incoming Batch (Receive Mode) -->
+            <div class="card card-files" id="files-card">
+                
+                <!-- SENDER VIEW -->
+                <div class="files-view" id="sender-files-view">
+                    <!-- Instant Text & Link Relay Bar (Top of Add files/folders) -->
+                    <div class="text-relay-bar" id="text-relay-bar">
+                        <div class="text-relay-left">
+                            <div class="text-relay-icon-wrap">
+                                <svg class="icon" style="width:16px;height:16px;color:#38bdf8;" viewBox="0 0 24 24">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                            </div>
+                            <div class="text-relay-texts">
+                                <span class="text-relay-label">Need to share a link, note, or password?</span>
+                                <span class="text-relay-sub">Instant zero-footprint peer clipboard relay</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-text-relay" id="open-text-relay-btn" title="Share text or link with peer">
+                            <span>Share Text</span>
+                            <svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </button>
+                    </div>
+
+                    <!-- Dual Add Buttons Grid (Transfer.it style) -->
+                    <div class="add-zones-grid">
+                        <div class="add-box" id="add-files-box" title="Click to browse files or drop here">
+                            <svg class="add-box-icon" viewBox="0 0 24 24">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="12" y1="18" x2="12" y2="12"></line>
+                                <line x1="9" y1="15" x2="15" y2="15"></line>
+                            </svg>
+                            <span class="add-box-title">Add files</span>
+                            <span class="add-box-sub">Select single or multiple files</span>
+                            <input type="file" id="file-input" multiple style="display: none;">
+                        </div>
+
+                        <div class="add-box" id="add-folders-box" title="Click to browse entire folder or drop here">
+                            <svg class="add-box-icon" viewBox="0 0 24 24">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                                <line x1="12" y1="11" x2="12" y2="17"></line>
+                                <line x1="9" y1="14" x2="15" y2="14"></line>
+                            </svg>
+                            <span class="add-box-title">Add folders</span>
+                            <span class="add-box-sub">Select whole directory</span>
+                            <input type="file" id="folder-input" webkitdirectory directory multiple style="display: none;">
+                        </div>
+                    </div>
+
+                    <!-- Staged Header Bar -->
+                    <div class="staged-header-row" id="staged-header-bar" style="display: none;">
+                        <div class="staged-counter">
+                            <span id="staged-count-text">0 files</span>
+                            <span class="dot-separator">•</span>
+                            <span id="staged-size-text">0 MB</span>
+                        </div>
+                        <button class="btn-icon-clear" id="clear-files-btn" title="Clear all staged files">
+                            <svg class="icon" style="width:16px;height:16px;" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+
+                    <!-- Scrollable Staged Files List -->
+                    <div class="file-list" id="staged-file-list" style="display: none;">
+                        <!-- JS populated with individual remove buttons -->
+                    </div>
+
+                    <!-- Empty state placeholder when no files are staged -->
+                    <div class="files-empty-state" id="files-empty-state">
+                        <svg class="icon" style="width:32px;height:32px;color:var(--text-muted);margin-bottom:8px;" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <span style="font-weight: 500; color: var(--text-secondary);">Drop files or folders here</span>
+                        <span style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">You can append multiple files and directories continuously</span>
+                    </div>
+                </div>
+
+                <!-- RECEIVER VIEW -->
+                <div class="files-view" id="receiver-files-view" style="display: none;">
+                    <div class="receive-idle-state" id="receive-idle-view">
+                        <svg class="icon" style="width:36px;height:36px;color:var(--text-muted);margin-bottom:10px;" viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span style="font-weight: 500; font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 4px;">Awaiting incoming transfer</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">Enter the 5-digit room code on the left to receive files</span>
+                    </div>
+
+                    <div id="receive-batch-content" style="display: none; flex-direction: column; height: 100%;">
+                        <div class="staged-header-row">
+                            <div class="staged-counter">
+                                <span id="incoming-batch-count">0 files</span>
+                                <span class="dot-separator">•</span>
+                                <span id="incoming-batch-size">0 MB</span>
+                            </div>
+                            <span class="badge">Incoming Batch</span>
+                        </div>
+                        <div class="file-list" id="incoming-file-list" style="display: flex;">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+    </div>
+
+    <!-- Site Footer -->
+    <footer class="site-footer">
+        <p class="footer-tagline">Direct browser-to-browser P2P file transfer. Zero cloud storage.</p>
+        <div class="footer-links">
+            <a href="/TermsOfService" class="footer-link">Terms of Service</a>
+            <span class="footer-divider">•</span>
+            <a href="/PrivacyPolicy" class="footer-link">Privacy Policy</a>
+            <span class="footer-divider">•</span>
+            <a href="/FAQ" class="footer-link">FAQ</a>
+        </div>
+        <p class="footer-copy">© 2026 FlashPeer. Decentralized peer-to-peer WebRTC file streaming.</p>
+    </footer>
+
+    <!-- History Modal -->
+    <div class="modal-overlay" id="history-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Transfer History</h2>
+                <button class="close-modal" id="close-history-btn"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            </div>
+            <div class="modal-body">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Content</th>
+                            <th>Total Size</th>
+                            <th>Role</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Text & Link Modal (Sender / Receiver Outgoing) -->
+    <div class="modal-overlay" id="text-send-modal">
+        <div class="modal-content text-modal-content">
+            <div class="modal-header">
+                <div class="modal-header-title-group">
+                    <div class="modal-icon-badge">
+                        <svg class="icon" style="width:17px;height:17px;color:#38bdf8;" viewBox="0 0 24 24">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2>Share Text or Link</h2>
+                        <span class="modal-sub-label">Direct P2P clipboard relay. Never touches a server.</span>
+                    </div>
+                </div>
+                <button class="close-modal" id="close-text-send-btn" title="Close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            </div>
+            <div class="modal-body text-modal-body">
+                <div class="peer-status-warning" id="text-peer-warning" style="display: none;">
+                    <svg class="icon" style="width:15px;height:15px;color:#f87171;flex-shrink:0;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <span>Connect to a peer using your room code first to beam text directly.</span>
+                </div>
+
+                <div class="textarea-container">
+                    <textarea id="text-relay-input" class="text-relay-textarea" placeholder="Paste or type text, link, Wi-Fi password, code snippet, or token here..." rows="6" maxlength="50000"></textarea>
+                    <div class="textarea-tools">
+                        <button type="button" class="btn-paste-clipboard" id="paste-clipboard-btn">
+                            <svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                            Paste from Clipboard
+                        </button>
+                        <span id="text-relay-char-count" class="char-counter">0 chars</span>
+                    </div>
+                </div>
+
+                <div class="modal-actions-row">
+                    <button type="button" class="btn btn-secondary" id="cancel-text-send-btn">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="send-text-btn">
+                        <svg class="icon" style="width:15px;height:15px;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        Beam to Peer ⚡
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Received Text Modal (Incoming Peer Clip) -->
+    <div class="modal-overlay" id="text-receive-modal">
+        <div class="modal-content text-modal-content">
+            <div class="modal-header">
+                <div class="modal-header-title-group">
+                    <div class="modal-icon-badge" style="background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.35);">
+                        <svg class="icon" style="width:17px;height:17px;color:#4ade80;" viewBox="0 0 24 24">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2>Incoming Text from Peer</h2>
+                        <span class="modal-sub-label" style="color: #4ade80; font-weight: 500;">Direct P2P Relay • End-to-End</span>
+                    </div>
+                </div>
+                <button class="close-modal" id="close-text-receive-btn" title="Close"><svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+            </div>
+            <div class="modal-body text-modal-body">
+                <div class="received-text-container">
+                    <pre class="received-text-box" id="received-text-display"></pre>
+                </div>
+                
+                <div id="received-url-actions" style="display: none; margin-top: 10px;">
+                    <a id="received-url-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-open-url">
+                        <svg class="icon" style="width:15px;height:15px;" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                        Open Link in New Tab ↗
+                    </a>
+                </div>
+
+                <div class="modal-actions-row" style="justify-content: space-between;">
+                    <span id="received-text-stats" class="char-counter">0 chars</span>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-secondary" id="reply-text-btn" style="display: inline-flex; align-items: center; gap: 6px;">
+                            <svg class="icon" style="width:14px;height:14px;" viewBox="0 0 24 24"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg>
+                            Reply
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="done-text-receive-btn">Done</button>
+                        <button type="button" class="btn btn-primary" id="copy-received-text-btn">
+                            <svg class="icon" style="width:15px;height:15px;" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy Text
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ephemeral Toast for Feedback -->
+    <div id="relay-toast" class="relay-toast"></div>
+
+    <script src="/script.js"></script>
+</body>
+</html>
