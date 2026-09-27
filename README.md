@@ -2,6 +2,8 @@
 
 FlashPeer is a fast, end-to-end encrypted peer-to-peer file and text transfer web application that runs directly in the browser. It allows two devices to transfer files of any size directly to each other without uploading anything to cloud servers or third-party storage.
 
+***Live Site:*** [https://flashpeer.pages.dev/](https://flashpeer.pages.dev/))
+
 ---
 
 > ### ⚠️ Project Disclaimer
