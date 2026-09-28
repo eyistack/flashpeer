@@ -1488,13 +1488,28 @@
             // 1. Use the File System Access API (window.showSaveFilePicker) when the transfer is accepted.
             // 2. Create a writable stream (fileHandle.createWritable()).
             // 3. Provide a graceful fallback to in-memory chunk array/Blob download if unsupported or cancelled.
+            function getPickerOptions(fileObj) {
+                const suggestedName = fileObj ? (fileObj.path || fileObj.name) : 'download';
+                const options = { suggestedName };
+                const extMatch = suggestedName.match(/\.([a-zA-Z0-9]+)$/);
+                if (extMatch) {
+                    const ext = `.${extMatch[1].toLowerCase()}`;
+                    const mime = (fileObj && fileObj.mimeType) ? fileObj.mimeType : (ext === '.pdf' ? 'application/pdf' : 'application/octet-stream');
+                    options.types = [{
+                        description: `${extMatch[1].toUpperCase()} File`,
+                        accept: {
+                            [mime]: [ext]
+                        }
+                    }];
+                }
+                return options;
+            }
+
             if ('showSaveFilePicker' in window && receivedManifest && receivedManifest.totalFiles === 1) {
                 try {
                     const firstFile = receivedManifest.files[0];
-                    const suggestedName = firstFile ? (firstFile.path || firstFile.name) : 'download';
-                    diskFileHandle = await window.showSaveFilePicker({
-                        suggestedName: suggestedName
-                    });
+                    const pickerOptions = getPickerOptions(firstFile);
+                    diskFileHandle = await window.showSaveFilePicker(pickerOptions);
                     diskWriter = await diskFileHandle.createWritable();
                     isDirectDiskStreaming = true;
                     console.log('[FlashPeer] Direct-to-Disk zero-RAM stream initialized via showSaveFilePicker');
@@ -1517,10 +1532,8 @@
             } else if ('showSaveFilePicker' in window && receivedManifest) {
                 try {
                     const firstFile = receivedManifest.files[0];
-                    const suggestedName = firstFile ? (firstFile.path || firstFile.name) : 'download';
-                    diskFileHandle = await window.showSaveFilePicker({
-                        suggestedName: suggestedName
-                    });
+                    const pickerOptions = getPickerOptions(firstFile);
+                    diskFileHandle = await window.showSaveFilePicker(pickerOptions);
                     diskWriter = await diskFileHandle.createWritable();
                     isDirectDiskStreaming = true;
                 } catch (pickerErr) {
@@ -1557,7 +1570,9 @@
             } else {
                 // Graceful fallback to an in-memory chunk array/Blob download if browser does not support File System Access API
                 try {
-                    const blob = new Blob(receivedChunks, { type: currentFileData.mimeType || 'application/octet-stream' });
+                    // Force application/octet-stream to ensure mobile browsers (e.g., Firefox Android)
+                    // trigger an immediate OS download instead of trying to preview PDFs/documents in a blank tab
+                    const blob = new Blob(receivedChunks, { type: 'application/octet-stream' });
                     let localHash = null;
                     if (blob.size <= 256 * 1024 * 1024) {
                         try {
@@ -1570,17 +1585,38 @@
                         displayReceiverChecksum(targetHash, isMatch);
                     }
 
-                    const downloadUrl = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = downloadUrl;
-                    a.download = currentFileData.name;
-                    a.style.display = 'none';
-                    document.body.appendChild(a);
-                    a.click();
-                    setTimeout(() => {
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(downloadUrl);
-                    }, 3000);
+                    const triggerDownload = (url) => {
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = currentFileData.name;
+                        a.target = '_self';
+                        a.rel = 'noopener';
+                        a.style.display = 'none';
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => {
+                            try { document.body.removeChild(a); } catch(e) {}
+                            if (url && url.startsWith('blob:')) {
+                                URL.revokeObjectURL(url);
+                            }
+                        }, 10000);
+                    };
+
+                    const isFirefoxAndroid = /Android/i.test(navigator.userAgent) && /Firefox/i.test(navigator.userAgent);
+                    if (isFirefoxAndroid && blob.size <= 64 * 1024 * 1024) {
+                        // Workaround for Firefox Android (Bugzilla #1634082):
+                        // blob: URLs cause Firefox Android to open about:blank. Converting to Data URL enables native download.
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            if (reader.result) {
+                                triggerDownload(reader.result);
+                            }
+                        };
+                        reader.readAsDataURL(blob);
+                    } else {
+                        const downloadUrl = URL.createObjectURL(blob);
+                        triggerDownload(downloadUrl);
+                    }
                 } catch (e) {
                     console.error('Failed to trigger in-memory Blob download fallback:', e);
                 }
